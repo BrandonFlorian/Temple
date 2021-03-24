@@ -17,9 +17,10 @@ var firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 
+const db = admin.firestore();
+
 app.get('/posts', (request, response) => {
-    admin
-    .firestore()
+    db
     .collection('posts')
     .orderBy('time', 'desc')
     .get()
@@ -44,8 +45,7 @@ app.post('/posts', (request, response) => {
             body : request.body.body,
             time : new Date().toISOString()
         };
-        admin
-        .firestore()
+        db
         .collection('posts')
         .add(newPost)
         .then(doc => {
@@ -65,6 +65,7 @@ app.post('/register', (request, response) => {
         user : request.body.user,
     };
 
+    db.doc(`/users/${newUser.user}`)
     firebase
     .auth()
     .createUserWithEmailAndPassword(newUser.email, newUser.password)
