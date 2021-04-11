@@ -2,8 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as express from "express";
 import firebase from "firebase";
-
-import { EmailValidator} from "./"
+import { EmailValidator } from "./validators/EmailValidator";
 
 const app = express();
 admin.initializeApp();
@@ -61,8 +60,6 @@ app.post('/posts', (request, response) => {
     });
 });
 
-
-
 //Register a user
 app.post('/register', (request, response) => {
     const newUser = {
@@ -71,7 +68,13 @@ app.post('/register', (request, response) => {
         confirmPassword: request.body.confirmPassword,
         handle: request.body.handle,
       };
-    
+      
+      let emailValidator: EmailValidator = new EmailValidator();
+      
+      if(!emailValidator.isAcceptable(newUser.email)){
+        response.status(400).json({ email: emailValidator.getErrors(newUser.email) });
+      }
+
       //Check if user handle exists before creating
       db.doc(`/users/${newUser.handle}`)
         .get()
