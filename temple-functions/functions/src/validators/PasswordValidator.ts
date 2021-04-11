@@ -36,9 +36,7 @@ export class PasswordValidator implements StringValidator {
         if (password.search(/[0-9]/) < 0) {
             errors.push("Your password must contain at least one digit."); 
         }
-        if(password.search(/[!@#$%^&*]/)){
-            errors.push("Your password must contain at least one special character."); 
-        }
+        //TODO: special characters?
         return errors;
     }
 }

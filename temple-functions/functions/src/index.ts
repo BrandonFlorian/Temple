@@ -2,8 +2,8 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as express from "express";
 import firebase from "firebase";
-import { EmailValidator } from "./validators/EmailValidator";
-import { PasswordValidator } from "./validators/PasswordValidator";
+import { RegistrationValidator } from "./validators/RegistrationValidator";
+
 
 const app = express();
 admin.initializeApp();
@@ -63,64 +63,51 @@ app.post('/posts', (request, response) => {
 
 //Register a user
 app.post('/register', (request, response) => {
-    const newUser = {
-        email: request.body.email,
-        password: request.body.password,
-        confirmPassword: request.body.confirmPassword,
-        handle: request.body.handle,
-      };
-      
-      //test email
-      let emailValidator: EmailValidator = new EmailValidator();
-      if(!emailValidator.isAcceptable(newUser.email)){
-        response.status(400).json({ email: emailValidator.getErrors(newUser.email) });
-      }
-      //test password
-      let passwordValidator: PasswordValidator = new PasswordValidator();
-      if(!passwordValidator.isAcceptable(newUser.password)){
-        response.status(400).json({password : passwordValidator.getErrors(newUser.password)});
-      }
-      //test confirm password
-      if(!passwordValidator.confirmPassword(newUser.password, newUser.confirmPassword)){
-        response.status(400).json({password : "Password and confirm password do not match"});
-      }
+  const newUser = {
+      email: request.body.email,
+      password: request.body.password,
+      confirmPassword: request.body.confirmPassword,
+      userHandle: request.body.userHandle,
+    };
 
-      //Check if user handle exists before creating
-      db.doc(`/users/${newUser.handle}`)
-        .get()
-        .then(doc => {
-          if (doc.exists) {
-            return response.status(400).json({ handle: "this handle is already taken" });
-          } else {
-            firebase
-              .auth()
-              .createUserWithEmailAndPassword(newUser.email, newUser.password);
-              return response.status(200).json({ handle: "handle successfully created" });
-          }
-        })
-        //Set
-        .then((idToken) => {
-          const userCredentials = {
-            handle: newUser.handle,
-            email: newUser.email,
-            createdAt: new Date().toISOString(),
-            //TODO Append token to imageUrl. Work around just add token from image in storage.
-          };
-          return db.doc(`/users/${newUser.handle}`).set(userCredentials);
-        })
-        .then(() => {
-          return response.status(201).json({ token: 'test' });
-        })
-        .catch((err) => {
-          console.error(err);
-          if (err.code === "auth/email-already-in-use") {
-            return response.status(400).json({ email: "Email is already is use" });
-          } else {
-            return response
-              .status(500)
-              .json({ general: "Something went wrong, please try again" });
-          }
-        });
+    let registrationValidator: RegistrationValidator = new RegistrationValidator();
+    registrationValidator.validateRegistrationDetails(newUser);
+
+    //Check if user handle exists before creating
+    db.doc(`/users/${newUser.userHandle}`)
+      .get()
+      .then(doc => {
+        if (doc.exists) {
+          return response.status(400).json({ userHandle: "this handle is already taken" });
+        } else if(!registrationValidator.isAcceptable()){
+          return response.status(400).json({ registration: registrationValidator.getErrors()});
+        }else {
+          firebase
+            .auth()
+            .createUserWithEmailAndPassword(newUser.email, newUser.password);
+            //Set
+            const userCredentials = {
+              userHandle: newUser.userHandle,
+              email: newUser.email,
+              createdAt: new Date().toISOString(),
+              //TODO Append token to imageUrl. Work around just add token from image in storage.
+            };
+            db.doc(`/users/${newUser.userHandle}`).set(userCredentials);
+            
+            return response.status(200).json({ userHandle: "handle successfully created" });
+        }
+      })
+      .then(() => {
+        return response.status(201).json({ token: 'OK' });
+      })
+      .catch((err) => {
+        console.error(err);
+        if (err.code === "auth/email-already-in-use") {
+          return response.status(400).json({ email: "Email is already is use" });
+        } else {
+          return response.status(500).json({ general: "Something went wrong, please try again" });
+        }
+      });
 });
 
 exports.api = functions.https.onRequest(app);
