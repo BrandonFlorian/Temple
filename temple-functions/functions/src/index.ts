@@ -2,6 +2,9 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import * as express from "express";
 import firebase from "firebase";
+
+import { EmailValidator} from "./"
+
 const app = express();
 admin.initializeApp();
 
@@ -18,7 +21,7 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 
 const db = admin.firestore();
-
+//get all posts
 app.get('/posts', (request, response) => {
     db
     .collection('posts')
@@ -30,7 +33,7 @@ app.get('/posts', (request, response) => {
             posts.push({
                 postId: doc.id,
                 body: doc.data().body,
-                user: doc.data().user,
+                userHandle: doc.data().userHandle,
                 time: doc.data().time
             })
         })
@@ -39,9 +42,10 @@ app.get('/posts', (request, response) => {
     .catch(err => console.error(err));
 });
 
+//Add a post
 app.post('/posts', (request, response) => {
         const newPost: {} = {
-            user : request.body.user,
+            userHandle : request.body.userHandle,
             body : request.body.body,
             time : new Date().toISOString()
         };
@@ -57,30 +61,53 @@ app.post('/posts', (request, response) => {
     });
 });
 
+
+
+//Register a user
 app.post('/register', (request, response) => {
     const newUser = {
-        email : request.body.email,
-        password : request.body.password,
-        confirmPassword : request.body.confirmPassword,
-        user : request.body.user,
-    };
-
-    db.doc(`/users/${newUser.user}`)
-    firebase
-    .auth()
-    .createUserWithEmailAndPassword(newUser.email, newUser.password)
-    .then( data =>{
-        if(data.user !== null){
-            return response.status(201).json({message : `user ${ data.user.uid } signed up successfully`})
-        }
-        else{
-            return response.status(500).json({error: "user is null"});
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        return response.status(500).json({error: err.code});
-    })
+        email: request.body.email,
+        password: request.body.password,
+        confirmPassword: request.body.confirmPassword,
+        handle: request.body.handle,
+      };
+    
+      //Check if user handle exists before creating
+      db.doc(`/users/${newUser.handle}`)
+        .get()
+        .then(doc => {
+          if (doc.exists) {
+            return response.status(400).json({ handle: "this handle is already taken" });
+          } else {
+            firebase
+              .auth()
+              .createUserWithEmailAndPassword(newUser.email, newUser.password);
+              return response.status(200).json({ handle: "handle successfully created" });
+          }
+        })
+        //Set
+        .then((idToken) => {
+          const userCredentials = {
+            handle: newUser.handle,
+            email: newUser.email,
+            createdAt: new Date().toISOString(),
+            //TODO Append token to imageUrl. Work around just add token from image in storage.
+          };
+          return db.doc(`/users/${newUser.handle}`).set(userCredentials);
+        })
+        .then(() => {
+          return response.status(201).json({ token: 'test' });
+        })
+        .catch((err) => {
+          console.error(err);
+          if (err.code === "auth/email-already-in-use") {
+            return response.status(400).json({ email: "Email is already is use" });
+          } else {
+            return response
+              .status(500)
+              .json({ general: "Something went wrong, please try again" });
+          }
+        });
 });
 
 exports.api = functions.https.onRequest(app);
