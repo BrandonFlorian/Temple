@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 import * as express from "express";
 import firebase from "firebase";
 import { EmailValidator } from "./validators/EmailValidator";
+import { PasswordValidator } from "./validators/PasswordValidator";
 
 const app = express();
 admin.initializeApp();
@@ -69,10 +70,19 @@ app.post('/register', (request, response) => {
         handle: request.body.handle,
       };
       
+      //test email
       let emailValidator: EmailValidator = new EmailValidator();
-      
       if(!emailValidator.isAcceptable(newUser.email)){
         response.status(400).json({ email: emailValidator.getErrors(newUser.email) });
+      }
+      //test password
+      let passwordValidator: PasswordValidator = new PasswordValidator();
+      if(!passwordValidator.isAcceptable(newUser.password)){
+        response.status(400).json({password : passwordValidator.getErrors(newUser.password)});
+      }
+      //test confirm password
+      if(!passwordValidator.confirmPassword(newUser.password, newUser.confirmPassword)){
+        response.status(400).json({password : "Password and confirm password do not match"});
       }
 
       //Check if user handle exists before creating

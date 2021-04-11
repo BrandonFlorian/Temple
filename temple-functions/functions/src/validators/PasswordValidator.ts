@@ -3,7 +3,7 @@ import { isEmpty } from "./utilities";
 export const passwordRegexp = /^(?=.*\d)(?=.*[!@#$%^&*])(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
 export class PasswordValidator implements StringValidator {
 
-  //check field for value and correct format
+    //check field for value and correct format
     isAcceptable(password: string) {
         return !isEmpty(password) && passwordRegexp.test(password);
     }
@@ -14,7 +14,15 @@ export class PasswordValidator implements StringValidator {
             return true;
         else 
             return false;
-        }
+    }
+
+    //checks if the password and confirm password match
+    confirmPassword(password: string, confirmPassword: string){
+        if(password === confirmPassword)
+            return true;
+        else
+            return false;
+    }
 
     //returns an array of errors with the input password
     getErrors(password: string){
