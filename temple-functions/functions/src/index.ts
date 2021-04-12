@@ -3,6 +3,8 @@ import * as admin from "firebase-admin";
 import * as express from "express";
 import firebase from "firebase";
 import { RegistrationValidator } from "./validators/RegistrationValidator";
+import { DataSnapshot } from "firebase-functions/lib/providers/database";
+import { user } from "firebase-functions/lib/providers/auth";
 
 
 const app = express();
@@ -73,39 +75,48 @@ app.post('/register', (request, response) => {
     let registrationValidator: RegistrationValidator = new RegistrationValidator();
     registrationValidator.validateRegistrationDetails(newUser);
 
+    let uid : string = "";
+    let idToken: string | undefined = "";
+
     //Check if user handle exists before creating
     db.doc(`/users/${newUser.userHandle}`)
       .get()
       .then(doc => {
-        if (doc.exists) {
+        if(doc.exists) {
           return response.status(400).json({ userHandle: "this handle is already taken" });
-        } else if(!registrationValidator.isAcceptable()){
-          return response.status(400).json({ registration: registrationValidator.getErrors()});
-        }else {
-          firebase
-            .auth()
-            .createUserWithEmailAndPassword(newUser.email, newUser.password);
-            //Set
-            const userCredentials = {
-              userHandle: newUser.userHandle,
-              email: newUser.email,
-              createdAt: new Date().toISOString(),
-              //TODO Append token to imageUrl. Work around just add token from image in storage.
-            };
-            db.doc(`/users/${newUser.userHandle}`).set(userCredentials);
-            
-            return response.status(200).json({ userHandle: "handle successfully created" });
         }
-      })
-      .then(() => {
-        return response.status(201).json({ token: 'OK' });
+        else if(!registrationValidator.isAcceptable()){
+          return response.status(400).json({ registration: registrationValidator.getErrors()});
+        } else {
+          admin
+            .auth()
+            .createUser({email: newUser.email, password: newUser.password})      
+            .then((data) => {
+              
+              uid = data.uid;
+              const userCredentials = {
+                userHandle: newUser.userHandle,
+                email: newUser.email,
+                password: newUser.password,
+                createdAt: new Date().toISOString(),
+                userId: uid
+                //TODO Append token to imageUrl. Work around just add token from image in storage.
+              };
+              return db.doc(`/users/${newUser.userHandle}`).set(userCredentials);
+            }).then(()=>{
+              return firebase.auth().currentUser?.getIdToken();
+            }).then(token => {
+                idToken = token;
+            });
+            return response.status(201).json({ userHandle: "handle created successfully", token: idToken })
+        }
       })
       .catch((err) => {
         console.error(err);
         if (err.code === "auth/email-already-in-use") {
           return response.status(400).json({ email: "Email is already is use" });
         } else {
-          return response.status(500).json({ general: "Something went wrong, please try again" });
+          return response.status(500).json({ error: err.code });
         }
       });
 });
