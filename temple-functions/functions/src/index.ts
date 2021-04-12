@@ -3,9 +3,6 @@ import * as admin from "firebase-admin";
 import * as express from "express";
 import firebase from "firebase";
 import { RegistrationValidator } from "./validators/RegistrationValidator";
-import { DataSnapshot } from "firebase-functions/lib/providers/database";
-import { user } from "firebase-functions/lib/providers/auth";
-
 
 const app = express();
 admin.initializeApp();
@@ -75,9 +72,8 @@ app.post('/register', (request, response) => {
     let registrationValidator: RegistrationValidator = new RegistrationValidator();
     registrationValidator.validateRegistrationDetails(newUser);
 
-    let uid : string = "";
-    let idToken: string | undefined = "";
-
+    let uid, idToken: string | undefined = "";
+    
     //Check if user handle exists before creating
     db.doc(`/users/${newUser.userHandle}`)
       .get()
@@ -88,16 +84,14 @@ app.post('/register', (request, response) => {
         else if(!registrationValidator.isAcceptable()){
           return response.status(400).json({ registration: registrationValidator.getErrors()});
         } else {
-          admin
+          firebase
             .auth()
-            .createUser({email: newUser.email, password: newUser.password})      
+            .createUserWithEmailAndPassword(newUser.email, newUser.password)      
             .then((data) => {
-              
-              uid = data.uid;
+              uid = data.user?.uid;
               const userCredentials = {
                 userHandle: newUser.userHandle,
                 email: newUser.email,
-                password: newUser.password,
                 createdAt: new Date().toISOString(),
                 userId: uid
                 //TODO Append token to imageUrl. Work around just add token from image in storage.
@@ -107,7 +101,7 @@ app.post('/register', (request, response) => {
               return firebase.auth().currentUser?.getIdToken();
             }).then(token => {
                 idToken = token;
-            });
+            })
             return response.status(201).json({ userHandle: "handle created successfully", token: idToken })
         }
       })

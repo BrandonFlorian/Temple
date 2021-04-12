@@ -1,5 +1,7 @@
+
 import { EmailValidator } from "./EmailValidator";
 import { PasswordValidator } from "./PasswordValidator";
+import { isEmpty } from "./utilities";
 export class RegistrationValidator {
 
         errors : {
@@ -23,6 +25,9 @@ export class RegistrationValidator {
 
   //validates a set of user data against the input rules
   validateRegistrationDetails(userData: {email: string, password: string, confirmPassword: string, userHandle: string}){
+    if(isEmpty(userData.userHandle)){
+      this.errors.email.push("handle must not be empty");
+    }
 
     let emailValidator: EmailValidator = new EmailValidator();
     if(!emailValidator.isAcceptable(userData.email)){
